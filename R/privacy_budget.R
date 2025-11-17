@@ -112,9 +112,9 @@ spend_privacy_budget <- function(budget, epsilon_spent, delta_spent = 0, operati
 print.privacy_budget <- function(x, ...) {
   cat("Privacy Budget\n")
   cat("==============\n")
-  cat(sprintf("Total:     ε = %.4f, δ = %.2e\n", x$epsilon_total, x$delta_total))
-  cat(sprintf("Spent:     ε = %.4f, δ = %.2e\n", x$epsilon_spent, x$delta_spent))
-  cat(sprintf("Remaining: ε = %.4f, δ = %.2e\n",
+  cat(sprintf("Total:     epsilon = %.4f, delta = %.2e\n", x$epsilon_total, x$delta_total))
+  cat(sprintf("Spent:     epsilon = %.4f, delta = %.2e\n", x$epsilon_spent, x$delta_spent))
+  cat(sprintf("Remaining: epsilon = %.4f, delta = %.2e\n",
               x$epsilon_total - x$epsilon_spent,
               x$delta_total - x$delta_spent))
   cat(sprintf("Composition: %s\n", x$composition))

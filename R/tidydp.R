@@ -5,8 +5,7 @@
 #' @docType package
 #' @name tidydp
 #' @importFrom magrittr %>%
-#' @importFrom rlang .data
-#' @importFrom stats rnorm runif
+#' @importFrom stats rnorm runif aggregate
 NULL
 
 #' Pipe operator

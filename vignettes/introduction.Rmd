@@ -1,0 +1,461 @@
+---
+title: "Introduction to tidydp: Tidy Differential Privacy"
+author: "Thomas Tarler"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Introduction to tidydp: Tidy Differential Privacy}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 5
+)
+set.seed(123)
+```
+
+## What is Differential Privacy?
+
+Differential privacy is a rigorous mathematical framework for protecting individual privacy while sharing aggregate information about a dataset. It provides formal guarantees that the presence or absence of any single individual in a dataset has minimal impact on the results of statistical queries.
+
+### Key Concepts
+
+**Privacy Parameters:**
+
+- **epsilon (ε)**: The privacy budget. Smaller values provide stronger privacy but add more noise. Typical values range from 0.01 (very private) to 10 (less private).
+- **delta (δ)**: The probability that the privacy guarantee fails. Usually set to a very small value like 1e-5 or 1e-6.
+
+**Privacy Mechanisms:**
+
+- **Laplace Mechanism**: Adds noise from the Laplace distribution. Provides pure ε-differential privacy (δ = 0).
+- **Gaussian Mechanism**: Adds noise from the Gaussian (normal) distribution. Provides (ε, δ)-differential privacy.
+
+## Installation
+
+```{r install, eval=FALSE}
+# Install from CRAN (when available)
+install.packages("tidydp")
+
+# Or install development version from GitHub
+devtools::install_github("ttarler/tidydp")
+```
+
+## Getting Started
+
+```{r library}
+library(tidydp)
+```
+
+### Basic Example: Adding Noise to Data
+
+The most straightforward use case is adding differentially private noise to columns in a data frame:
+
+```{r basic_noise}
+# Create sample data
+employee_data <- data.frame(
+  name = c("Alice", "Bob", "Charlie", "Diana", "Eve"),
+  age = c(28, 35, 42, 31, 38),
+  salary = c(65000, 75000, 85000, 70000, 80000)
+)
+
+# View original data
+head(employee_data)
+
+# Add differential privacy noise
+private_data <- employee_data %>%
+  dp_add_noise(
+    columns = c("age", "salary"),
+    epsilon = 0.5,
+    lower = c(age = 22, salary = 50000),
+    upper = c(age = 65, salary = 150000)
+  )
+
+# View privatized data
+head(private_data)
+```
+
+Notice how the numeric columns now have noise added while preserving the names column.
+
+## Core Functions
+
+### Differentially Private Counting
+
+Count the number of records with privacy guarantees:
+
+```{r counting}
+# Create sample data
+city_data <- data.frame(
+  city = rep(c("New York", "Los Angeles", "Chicago"), c(150, 120, 80)),
+  category = sample(c("A", "B", "C"), 350, replace = TRUE)
+)
+
+# Overall count
+overall_count <- city_data %>%
+  dp_count(epsilon = 0.1)
+print(overall_count)
+
+# Grouped count by city
+city_counts <- city_data %>%
+  dp_count(epsilon = 0.1, group_by = "city")
+print(city_counts)
+
+# Count by multiple groups
+city_category_counts <- city_data %>%
+  dp_count(epsilon = 0.1, group_by = c("city", "category"))
+head(city_category_counts)
+```
+
+### Differentially Private Mean
+
+Compute private averages:
+
+```{r mean}
+# Create sample data
+income_data <- data.frame(
+  region = rep(c("North", "South", "East", "West"), each = 100),
+  income = c(
+    rnorm(100, mean = 60000, sd = 15000),
+    rnorm(100, mean = 55000, sd = 12000),
+    rnorm(100, mean = 65000, sd = 18000),
+    rnorm(100, mean = 58000, sd = 14000)
+  )
+)
+
+# Overall mean income
+avg_income <- income_data %>%
+  dp_mean(
+    "income",
+    epsilon = 0.2,
+    lower = 20000,
+    upper = 150000
+  )
+print(avg_income)
+
+# Mean by region
+regional_avg <- income_data %>%
+  dp_mean(
+    "income",
+    epsilon = 0.2,
+    lower = 20000,
+    upper = 150000,
+    group_by = "region"
+  )
+print(regional_avg)
+```
+
+### Differentially Private Sum
+
+Compute private totals:
+
+```{r sum}
+# Create sales data
+sales_data <- data.frame(
+  store = rep(c("Store A", "Store B", "Store C"), each = 50),
+  sales = c(
+    rpois(50, lambda = 1000),
+    rpois(50, lambda = 1200),
+    rpois(50, lambda = 900)
+  )
+)
+
+# Total sales by store
+store_totals <- sales_data %>%
+  dp_sum(
+    "sales",
+    epsilon = 0.3,
+    lower = 0,
+    upper = 5000,
+    group_by = "store"
+  )
+print(store_totals)
+```
+
+## Privacy Budget Management
+
+When performing multiple queries on the same dataset, you need to track your total privacy expenditure using a privacy budget:
+
+```{r budget}
+# Create a privacy budget
+budget <- new_privacy_budget(
+  epsilon_total = 1.0,
+  delta_total = 1e-5
+)
+
+print(budget)
+
+# Perform first query
+result1 <- city_data %>%
+  dp_count(epsilon = 0.3, .budget = budget)
+
+print(budget)
+
+# Perform second query
+result2 <- city_data %>%
+  dp_count(epsilon = 0.4, group_by = "city", .budget = budget)
+
+print(budget)
+
+# Check if we have enough budget for another query
+can_query <- check_privacy_budget(budget, epsilon_required = 0.5)
+print(paste("Can perform query with epsilon=0.5?", can_query))
+
+# We only have 0.3 epsilon remaining
+can_query <- check_privacy_budget(budget, epsilon_required = 0.2)
+print(paste("Can perform query with epsilon=0.2?", can_query))
+```
+
+### Budget Composition
+
+The tidydp package uses **basic composition** by default, where the total privacy cost is the sum of individual query costs:
+
+$$\epsilon_{total} = \sum_{i=1}^{k} \epsilon_i$$
+
+This is a conservative approach that ensures strong privacy guarantees.
+
+## Choosing Privacy Parameters
+
+### Epsilon (ε)
+
+| Epsilon Value | Privacy Level | Use Case |
+|--------------|---------------|----------|
+| 0.01 - 0.1   | Very Strong   | Highly sensitive medical or financial data |
+| 0.1 - 1.0    | Strong        | Personal information, general sensitive data |
+| 1.0 - 5.0    | Moderate      | Less sensitive aggregate statistics |
+| 5.0+         | Weak          | Public or minimally sensitive data |
+
+### Delta (δ)
+
+- Typically set to 1/n² or 1/n³ where n is the dataset size
+- Common values: 1e-5, 1e-6, 1e-7
+- Should always be much smaller than 1/n
+
+### Data Bounds
+
+Providing accurate bounds is crucial for utility:
+
+```{r bounds_comparison}
+# Example: Impact of bounds on utility
+test_data <- data.frame(age = c(25, 30, 35, 40, 45))
+
+# Tight bounds (accurate)
+tight_bounds <- test_data %>%
+  dp_add_noise(
+    columns = "age",
+    epsilon = 0.5,
+    lower = c(age = 20),
+    upper = c(age = 50)
+  )
+
+# Loose bounds (less accurate)
+loose_bounds <- test_data %>%
+  dp_add_noise(
+    columns = "age",
+    epsilon = 0.5,
+    lower = c(age = 0),
+    upper = c(age = 100)
+  )
+
+# Compare results
+data.frame(
+  Original = test_data$age,
+  Tight_Bounds = round(tight_bounds$age, 1),
+  Loose_Bounds = round(loose_bounds$age, 1)
+)
+```
+
+Tighter bounds lead to better utility (less noise) while maintaining the same privacy guarantee.
+
+## Mechanism Selection
+
+### When to use Laplace vs Gaussian
+
+**Use Laplace** (default):
+- When you need pure ε-differential privacy (δ = 0)
+- For counting queries
+- When δ > 0 is not acceptable
+
+**Use Gaussian**:
+- When (ε, δ)-differential privacy is acceptable
+- Often provides better utility for the same privacy level
+- When working with continuous data and aggregates
+
+```{r mechanism_comparison}
+# Compare mechanisms
+test_values <- data.frame(value = c(100, 200, 300, 400, 500))
+
+# Laplace mechanism
+laplace_result <- test_values %>%
+  dp_add_noise(
+    columns = "value",
+    epsilon = 0.5,
+    lower = c(value = 0),
+    upper = c(value = 1000),
+    mechanism = "laplace"
+  )
+
+# Gaussian mechanism
+gaussian_result <- test_values %>%
+  dp_add_noise(
+    columns = "value",
+    epsilon = 0.5,
+    delta = 1e-5,
+    lower = c(value = 0),
+    upper = c(value = 1000),
+    mechanism = "gaussian"
+  )
+
+data.frame(
+  Original = test_values$value,
+  Laplace = round(laplace_result$value, 1),
+  Gaussian = round(gaussian_result$value, 1)
+)
+```
+
+## Complete Workflow Example
+
+Here's a complete example analyzing employee data while maintaining differential privacy:
+
+```{r complete_example}
+# Create employee dataset
+employees <- data.frame(
+  department = rep(c("Engineering", "Sales", "Marketing", "HR"), each = 25),
+  salary = c(
+    rnorm(25, 85000, 15000),  # Engineering
+    rnorm(25, 70000, 12000),  # Sales
+    rnorm(25, 65000, 10000),  # Marketing
+    rnorm(25, 60000, 8000)    # HR
+  ),
+  years_experience = c(
+    rpois(25, 5),
+    rpois(25, 4),
+    rpois(25, 3),
+    rpois(25, 4)
+  )
+)
+
+# Ensure realistic bounds
+employees$salary <- pmax(40000, pmin(150000, employees$salary))
+employees$years_experience <- pmax(0, pmin(20, employees$years_experience))
+
+# Initialize privacy budget
+analysis_budget <- new_privacy_budget(epsilon_total = 2.0)
+
+# Query 1: Count by department (epsilon = 0.5)
+dept_counts <- employees %>%
+  dp_count(
+    epsilon = 0.5,
+    group_by = "department",
+    .budget = analysis_budget
+  )
+
+cat("\nEmployee counts by department:\n")
+print(dept_counts)
+
+# Query 2: Average salary by department (epsilon = 0.8)
+dept_salaries <- employees %>%
+  dp_mean(
+    "salary",
+    epsilon = 0.8,
+    lower = 40000,
+    upper = 150000,
+    group_by = "department",
+    .budget = analysis_budget
+  )
+
+cat("\nAverage salaries by department:\n")
+print(dept_salaries)
+
+# Query 3: Average experience (epsilon = 0.4)
+avg_experience <- employees %>%
+  dp_mean(
+    "years_experience",
+    epsilon = 0.4,
+    lower = 0,
+    upper = 20,
+    .budget = analysis_budget
+  )
+
+cat("\nAverage years of experience:\n")
+print(avg_experience)
+
+# Check remaining budget
+cat("\nFinal budget status:\n")
+print(analysis_budget)
+```
+
+## Best Practices
+
+1. **Start with a clear privacy budget**: Decide upfront how much privacy loss is acceptable
+2. **Use tight bounds**: Provide accurate lower and upper bounds for better utility
+3. **Track your budget**: Use `new_privacy_budget()` for multiple queries
+4. **Test with synthetic data**: Validate your privacy-utility tradeoff before deploying
+5. **Document your choices**: Record epsilon, delta, and bounds for reproducibility
+6. **Consider query sensitivity**: Different queries have different privacy costs
+7. **Aggregate before privatizing**: Reduce sensitivity by aggregating data first
+
+## Common Pitfalls
+
+### Pitfall 1: Repeated Queries
+Don't run the same query multiple times without accounting for cumulative privacy loss:
+
+```{r pitfall1, eval=FALSE}
+# BAD: Running same query multiple times
+for (i in 1:10) {
+  result <- data %>% dp_count(epsilon = 0.1)
+}
+# Total cost: 10 * 0.1 = 1.0 epsilon!
+```
+
+### Pitfall 2: Ignoring Bounds
+Not providing bounds forces the algorithm to use data-dependent bounds, which can leak information:
+
+```{r pitfall2, eval=FALSE}
+# BETTER: Provide explicit bounds
+result <- data %>%
+  dp_mean("income", epsilon = 0.5, lower = 0, upper = 200000)
+
+# WORSE: Let algorithm infer bounds from data
+result <- data %>%
+  dp_mean("income", epsilon = 0.5)
+```
+
+### Pitfall 3: Epsilon Too Large
+Using epsilon > 10 provides minimal privacy protection:
+
+```{r pitfall3}
+# Very weak privacy
+weak_privacy <- test_values %>%
+  dp_add_noise(
+    columns = "value",
+    epsilon = 50,  # Too large!
+    lower = c(value = 0),
+    upper = c(value = 1000)
+  )
+
+# The noise is minimal
+data.frame(
+  Original = test_values$value,
+  With_Noise = round(weak_privacy$value, 1),
+  Difference = round(abs(test_values$value - weak_privacy$value), 1)
+)
+```
+
+## Further Reading
+
+- Dwork, C., & Roth, A. (2014). *The Algorithmic Foundations of Differential Privacy*
+- [Differential Privacy Team at Apple](https://www.apple.com/privacy/docs/Differential_Privacy_Overview.pdf)
+- [Google's Differential Privacy Library](https://github.com/google/differential-privacy)
+- [OpenDP Project](https://opendp.org/)
+
+## Getting Help
+
+If you encounter issues or have questions:
+
+- File an issue: [https://github.com/ttarler/tidydp/issues](https://github.com/ttarler/tidydp/issues)
+- Check documentation: `?tidydp`, `?dp_add_noise`, `?dp_count`, etc.
+- View examples: Run `example(dp_add_noise)`

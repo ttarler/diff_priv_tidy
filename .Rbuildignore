@@ -4,3 +4,7 @@
 ^LICENSE\.md$
 ^\.git$
 ^\.github$
+^\.claude$
+^examples$
+^doc$
+^Meta$
