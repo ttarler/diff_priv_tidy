@@ -1,0 +1,24 @@
+Package: tidydp
+Type: Package
+Title: Tidy Differential Privacy
+Version: 0.1.0
+Authors@R: person("Thomas", "Tarler", email = "ttarler@gmail.com",
+                  role = c("aut", "cre"))
+Description: A tidy-style interface for applying differential privacy to data frames.
+    Provides pipe-friendly functions to add calibrated noise, compute private statistics,
+    and track privacy budgets using the epsilon-delta differential privacy framework.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 7.2.3
+Imports:
+    magrittr,
+    dplyr,
+    rlang
+Suggests:
+    testthat (>= 3.0.0),
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr
+URL: https://github.com/ttarler/tidydp
+BugReports: https://github.com/ttarler/tidydp/issues
