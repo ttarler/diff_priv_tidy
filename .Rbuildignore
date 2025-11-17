@@ -8,3 +8,7 @@
 ^examples$
 ^doc$
 ^Meta$
+^Dockerfile$
+^\.dockerignore$
+^TESTING\.md$
+^LINUX_COMPATIBILITY\.md$

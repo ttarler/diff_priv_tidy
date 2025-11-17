@@ -1,0 +1,11 @@
+.git
+.github
+.Rproj.user
+.Rhistory
+.RData
+*.Rproj
+doc/
+Meta/
+*.Rcheck/
+.DS_Store
+examples/
